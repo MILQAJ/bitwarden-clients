@@ -1,5 +1,5 @@
 import { AlgorithmsByType } from "./data";
-import { CoreProfileMetadata, ExtensionProfileMetadata, ProfileMetadata } from "./profile-metadata";
+import { CoreProfileMetadata, ForwarderProfileMetadata, ProfileMetadata } from "./profile-metadata";
 import {
   CredentialAlgorithm,
   EmailAlgorithm,
@@ -55,6 +55,6 @@ export function isCoreProfile<Options>(
 /** Returns true when the input describes a forwarder extension profile. */
 export function isForwarderProfile<Options>(
   value: ProfileMetadata<Options>,
-): value is ExtensionProfileMetadata<Options, "forwarder"> {
+): value is ForwarderProfileMetadata<Options> {
   return value.type === "extension" && value.site === "forwarder";
 }
