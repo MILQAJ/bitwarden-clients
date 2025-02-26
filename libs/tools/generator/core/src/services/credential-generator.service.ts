@@ -1,16 +1,25 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
-import { concatMap, distinctUntilChanged, map, Observable, switchMap, takeUntil } from "rxjs";
+import {
+  concatMap,
+  distinctUntilChanged,
+  map,
+  Observable,
+  shareReplay,
+  switchMap,
+  takeUntil,
+  tap,
+} from "rxjs";
 import { Simplify } from "type-fest";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { Account } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { BoundDependency, OnDependency } from "@bitwarden/common/tools/dependencies";
 import { IntegrationMetadata } from "@bitwarden/common/tools/integration";
 import { RestClient } from "@bitwarden/common/tools/integration/rpc";
+import { SemanticLogger } from "@bitwarden/common/tools/log";
+import { SystemServiceProvider } from "@bitwarden/common/tools/providers";
 import { anyComplete, withLatestReady } from "@bitwarden/common/tools/rx";
 import { UserStateSubject } from "@bitwarden/common/tools/state/user-state-subject";
 import { UserStateSubjectDependencyProvider } from "@bitwarden/common/tools/state/user-state-subject-dependency-provider";
@@ -22,8 +31,14 @@ import {
   Integrations,
   toCredentialGeneratorConfiguration,
 } from "../data";
+import {
+  Profile,
+  GeneratorMetadata,
+  GeneratorProfile,
+  isForwarderProfile,
+  toVendorId,
+} from "../metadata";
 import { availableAlgorithms } from "../policies/available-algorithms-policy";
-import { mapPolicyToConstraints } from "../rx";
 import {
   CredentialAlgorithm,
   CredentialCategories,
@@ -35,53 +50,87 @@ import {
   GenerateRequest,
 } from "../types";
 import {
-  CredentialGeneratorConfiguration as Configuration,
   CredentialGeneratorInfo,
   GeneratorDependencyProvider,
 } from "../types/credential-generator-configuration";
 import { GeneratorConstraints } from "../types/generator-constraints";
 
-import { PREFERENCES } from "./credential-preferences";
+import { GeneratorMetadataProvider } from "./generator-metadata-provider";
+import { GeneratorProfileProvider } from "./generator-profile-provider";
 
 type Generate$Dependencies = Simplify<
   OnDependency<GenerateRequest> & BoundDependency<"account", Account>
 >;
 
+type CredentialGeneratorServiceProvider = UserStateSubjectDependencyProvider & {
+  readonly random: Randomizer;
+  readonly rest: RestClient; // = new RestClient(this.apiService, this.i18nService)
+  // FIXME: introduce "may require translation" types into metadata
+  //        structures and remove this dependency
+  readonly i18n: I18nService;
+  readonly profile: GeneratorProfileProvider;
+  readonly metadata: GeneratorMetadataProvider;
+};
+
 export class CredentialGeneratorService {
   constructor(
-    private readonly randomizer: Randomizer,
-    private readonly policyService: PolicyService,
-    private readonly apiService: ApiService,
-    private readonly i18nService: I18nService,
-    private readonly providers: UserStateSubjectDependencyProvider,
-  ) {}
-
-  private getDependencyProvider(): GeneratorDependencyProvider {
-    return {
-      client: new RestClient(this.apiService, this.i18nService),
-      i18nService: this.i18nService,
-      randomizer: this.randomizer,
-    };
+    private readonly service: CredentialGeneratorServiceProvider,
+    private readonly system: SystemServiceProvider,
+  ) {
+    this.log = system.log({ type: "CredentialGeneratorService" });
   }
 
-  // FIXME: the rxjs methods of this service can be a lot more resilient if
-  // `Subjects` are introduced where sharing occurs
+  private readonly log: SemanticLogger;
+
+  private getEngineDependencies(): GeneratorDependencyProvider {
+    return {
+      client: this.service.rest,
+      i18nService: this.service.i18n,
+      randomizer: this.service.random,
+    };
+  }
 
   /** Generates a stream of credentials
    * @param configuration determines which generator's settings are loaded
    * @param dependencies.on$ Required. A new credential is emitted when this emits.
    */
-  generate$<Settings extends object, Policy>(
-    configuration: Readonly<Configuration<Settings, Policy>>,
-    dependencies: Generate$Dependencies,
-  ) {
-    const engine = configuration.engine.create(this.getDependencyProvider());
-    const settings$ = this.settings$(configuration, dependencies);
+  generate$(dependencies: Generate$Dependencies) {
+    // `on$` is partitioned into several streams so that the generator
+    // engine and settings refresh only when their respective inputs change
+    const on$ = dependencies.on$.pipe(shareReplay({ refCount: true, bufferSize: 1 }));
+    const account$ = dependencies.account$.pipe(shareReplay({ refCount: true, bufferSize: 1 }));
+
+    // load algorithm metadata
+    const algorithm$ = on$.pipe(
+      switchMap((requested) => {
+        if (requested.category || requested.algorithm) {
+          return this.service.metadata.algorithm$(requested, { account$ });
+        } else {
+          this.log.panic(requested, "algorithm or category required");
+        }
+      }),
+      distinctUntilChanged((previous, current) => previous.id === current.id),
+    );
+
+    // load the active profile's algorithm settings
+    const settings$ = on$.pipe(
+      map((request) => request.profile ?? Profile.account),
+      distinctUntilChanged(),
+      withLatestReady(algorithm$),
+      switchMap(([profile, meta]) => this.settings(meta, { account$ }, profile)),
+    );
+
+    // load the algorithm's engine
+    const engine$ = algorithm$.pipe(
+      tap((meta) => this.log.info({ algorithm: meta.id }, "engine selected")),
+      map((meta) => meta.engine.create(this.getEngineDependencies())),
+    );
 
     // generation proper
-    const generate$ = dependencies.on$.pipe(
+    const generate$ = on$.pipe(
+      withLatestReady(engine$),
       withLatestReady(settings$),
-      concatMap(([request, settings]) => engine.generate(request, settings)),
+      concatMap(([[request, engine], settings]) => engine.generate(request, settings)),
       takeUntil(anyComplete([settings$])),
     );
 
@@ -114,7 +163,7 @@ export class CredentialGeneratorService {
     const algorithms$ = dependencies.account$.pipe(
       distinctUntilChanged(),
       switchMap((account) => {
-        const policies$ = this.policyService.getAll$(PolicyType.PasswordGenerator, account.id).pipe(
+        const policies$ = this.system.policy.getAll$(PolicyType.PasswordGenerator, account.id).pipe(
           map((p) => new Set(availableAlgorithms(p))),
           // complete policy emissions otherwise `switchMap` holds `algorithms$` open indefinitely
           takeUntil(anyComplete(dependencies.account$)),
@@ -182,18 +231,18 @@ export class CredentialGeneratorService {
     const info: AlgorithmInfo = {
       id: generator.id,
       category: generator.category,
-      name: integration ? integration.name : this.i18nService.t(generator.nameKey),
-      generate: this.i18nService.t(generator.generateKey),
-      onGeneratedMessage: this.i18nService.t(generator.onGeneratedMessageKey),
-      credentialType: this.i18nService.t(generator.credentialTypeKey),
-      copy: this.i18nService.t(generator.copyKey),
-      useGeneratedValue: this.i18nService.t(generator.useGeneratedValueKey),
+      name: integration ? integration.name : this.service.i18n.t(generator.nameKey),
+      generate: this.service.i18n.t(generator.generateKey),
+      onGeneratedMessage: this.service.i18n.t(generator.onGeneratedMessageKey),
+      credentialType: this.service.i18n.t(generator.credentialTypeKey),
+      copy: this.service.i18n.t(generator.copyKey),
+      useGeneratedValue: this.service.i18n.t(generator.useGeneratedValueKey),
       onlyOnRequest: generator.onlyOnRequest,
       request: generator.request,
     };
 
     if (generator.descriptionKey) {
-      info.description = this.i18nService.t(generator.descriptionKey);
+      info.description = this.service.i18n.t(generator.descriptionKey);
     }
 
     return info;
@@ -203,24 +252,14 @@ export class CredentialGeneratorService {
    * @param configuration determines which generator's settings are loaded
    * @param dependencies.account$ identifies the account to which the settings are bound.
    * @returns an observable that emits settings
-   * @remarks the observable enforces policies on the settings
+   * @deprecated use `settings` instead.
    */
-  settings$<Settings extends object, Policy>(
-    configuration: Configuration<Settings, Policy>,
+  settings$<Settings extends object>(
+    metadata: Readonly<GeneratorMetadata<Settings>>,
     dependencies: BoundDependency<"account", Account>,
-  ) {
-    const constraints$ = this.policy$(configuration, dependencies);
-
-    const settings = new UserStateSubject(configuration.settings.account, this.providers, {
-      constraints$,
-      account$: dependencies.account$,
-    });
-
-    const settings$ = settings.pipe(
-      map((settings) => settings ?? structuredClone(configuration.settings.initial)),
-    );
-
-    return settings$;
+    profile: GeneratorProfile = Profile.account,
+  ): Observable<Settings> {
+    return this.settings(metadata, dependencies, profile);
   }
 
   /** Get a subject bound to credential generator preferences.
@@ -234,10 +273,7 @@ export class CredentialGeneratorService {
   preferences(
     dependencies: BoundDependency<"account", Account>,
   ): UserStateSubject<CredentialPreference> {
-    // FIXME: enforce policy
-    const subject = new UserStateSubject(PREFERENCES, this.providers, dependencies);
-
-    return subject;
+    return this.service.metadata.preferences(dependencies);
   }
 
   /** Get a subject bound to a specific user's settings
@@ -246,18 +282,28 @@ export class CredentialGeneratorService {
    * @returns a subject bound to the requested user's generator settings
    * @remarks the subject enforces policy for the settings
    */
-  settings<Settings extends object, Policy>(
-    configuration: Readonly<Configuration<Settings, Policy>>,
+  settings<Settings extends object>(
+    metadata: Readonly<GeneratorMetadata<Settings>>,
     dependencies: BoundDependency<"account", Account>,
-  ) {
-    const constraints$ = this.policy$(configuration, dependencies);
+    profile: GeneratorProfile = Profile.account,
+  ): UserStateSubject<Settings> {
+    const activeProfile = metadata.profiles[profile];
 
-    const subject = new UserStateSubject(configuration.settings.account, this.providers, {
-      constraints$,
-      account$: dependencies.account$,
-    });
+    let settings: UserStateSubject<Settings>;
+    if (isForwarderProfile(activeProfile)) {
+      const vendor = toVendorId(metadata.id);
+      if (!vendor) {
+        this.log.panic("failed to load extension profile; vendor not specified");
+      }
 
-    return subject;
+      this.log.info({ profile, vendor, site: activeProfile.site }, "loading extension profile");
+      settings = this.system.extension.settings(activeProfile, vendor, dependencies);
+    } else {
+      this.log.info({ profile, algorithm: metadata.id }, "loading generator profile");
+      settings = this.service.profile.settings(activeProfile, dependencies);
+    }
+
+    return settings;
   }
 
   /** Get the policy constraints for the provided configuration
@@ -265,30 +311,12 @@ export class CredentialGeneratorService {
    *  @returns an observable that emits the policy once `dependencies.account$`
    *   and the policy become available.
    */
-  policy$<Settings, Policy>(
-    configuration: Configuration<Settings, Policy>,
+  policy$<Settings>(
+    metadata: Readonly<GeneratorMetadata<Settings>>,
     dependencies: BoundDependency<"account", Account>,
+    profile: GeneratorProfile = Profile.account,
   ): Observable<GeneratorConstraints<Settings>> {
-    const constraints$ = dependencies.account$.pipe(
-      map((account) => {
-        if (account.emailVerified) {
-          return { userId: account.id, email: account.email };
-        }
-
-        return { userId: account.id, email: null };
-      }),
-      switchMap(({ userId, email }) => {
-        // complete policy emissions otherwise `switchMap` holds `policies$` open indefinitely
-        const policies$ = this.policyService
-          .getAll$(configuration.policy.type, userId)
-          .pipe(
-            mapPolicyToConstraints(configuration.policy, email),
-            takeUntil(anyComplete(dependencies.account$)),
-          );
-        return policies$;
-      }),
-    );
-
-    return constraints$;
+    const activeProfile = metadata.profiles[profile];
+    return this.service.profile.constraints$(activeProfile, dependencies);
   }
 }
