@@ -19,6 +19,11 @@ export type ExtensionId = { site: SiteId; vendor: VendorId };
 /** Permission levels for metadata. */
 export type ExtensionPermission = keyof typeof Permission;
 
+/** The preferred vendor to use at each site. */
+export type ExtensionPreferences = {
+  [key in SiteId]?: { vendor: VendorId; updated: Date };
+};
+
 /** The capabilities and descriptive content for an extension */
 export type SiteMetadata = {
   /** Uniquely identifies the extension site. */
@@ -110,6 +115,11 @@ export type ExtensionSet =
       all: true;
     };
 
+export type ExtensionStorageKey<Options> = Omit<
+  ObjectKey<Options>,
+  "target" | "state" | "format" | "classifier"
+>;
+
 /** Extension profiles encapsulate data storage using the extension system.
  */
 export type ExtensionProfileMetadata<Options, Site extends SiteId> = {
@@ -124,5 +134,5 @@ export type ExtensionProfileMetadata<Options, Site extends SiteId> = {
    *  where `extension.`-prefixed fields are read from extension metadata. Extension
    *  settings always use the "classified" format and keep all fields private.
    */
-  storage: Omit<ObjectKey<Options>, "state" | "format" | "classifier">;
+  storage: ExtensionStorageKey<Options>;
 };
