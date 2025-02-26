@@ -1,3 +1,5 @@
+import { VendorId } from "@bitwarden/common/tools/extension";
+
 import { AlgorithmsByType } from "./data";
 import { CoreProfileMetadata, ForwarderProfileMetadata, ProfileMetadata } from "./profile-metadata";
 import {
@@ -27,6 +29,12 @@ export function isForwarderExtensionId(
   algorithm: CredentialAlgorithm,
 ): algorithm is ForwarderExtensionId {
   return algorithm && typeof algorithm === "object" && "forwarder" in algorithm;
+}
+
+export function toVendorId(algorithm: CredentialAlgorithm): VendorId | undefined {
+  if (isForwarderExtensionId(algorithm)) {
+    return algorithm.forwarder as VendorId;
+  }
 }
 
 /** Returns true when the input algorithm is an email algorithm. */
