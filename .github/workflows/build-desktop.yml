@@ -237,7 +237,7 @@ jobs:
           node build.js cross-platform
 
       - name: Build application
-        run: npm run dist:lin
+        run: npm run dist:lin:arm64
 
       - name: TEST STEP
         run: ls -alh apps/desktop/dist
