@@ -152,7 +152,7 @@ jobs:
     # The snap base for desktop is defined in `apps/desktop/electron-builder.json`
     # We intentionally keep this runner on the oldest supported OS in GitHub Actions
     # for maximum compatibility across GLIBC versions
-    runs-on: [self-hosted, linux, ARM64, clients]
+    runs-on: [self-hosted, linux, ARM64, vgrassia]
     needs: setup
     env:
       _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
