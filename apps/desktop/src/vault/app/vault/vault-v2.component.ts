@@ -211,6 +211,9 @@ export class VaultV2Component implements OnInit, OnDestroy {
               case "newSecureNote":
                 await this.addCipher(CipherType.SecureNote).catch(() => {});
                 break;
+              case "newSshKey":
+                await this.addCipher(CipherType.SshKey).catch(() => {});
+                break;
               case "focusSearch":
                 (document.querySelector("#search") as HTMLInputElement)?.select();
                 detectChanges = false;
@@ -549,28 +552,6 @@ export class VaultV2Component implements OnInit, OnDestroy {
     this.action = "add";
     this.prefillNewCipherFromFilter();
     await this.go().catch(() => {});
-  }
-
-  addCipherOptions() {
-    const menu: RendererMenuItem[] = [
-      {
-        label: this.i18nService.t("typeLogin"),
-        click: () => this.addCipherWithChangeDetection(CipherType.Login),
-      },
-      {
-        label: this.i18nService.t("typeCard"),
-        click: () => this.addCipherWithChangeDetection(CipherType.Card),
-      },
-      {
-        label: this.i18nService.t("typeIdentity"),
-        click: () => this.addCipherWithChangeDetection(CipherType.Identity),
-      },
-      {
-        label: this.i18nService.t("typeSecureNote"),
-        click: () => this.addCipherWithChangeDetection(CipherType.SecureNote),
-      },
-    ];
-    invokeMenu(menu);
   }
 
   async savedCipher(cipher: CipherView) {
