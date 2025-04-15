@@ -210,10 +210,10 @@ export default class RuntimeBackground {
           FeatureFlag.UseTreeWalkerApiForPageDetailsCollection,
         );
       }
-      case "getUserPremiumStatus": {
-        const activeUserId = await firstValueFrom(
-          this.accountService.activeAccount$.pipe(map((a) => a?.id)),
-        );
+      Case "getUserPremiumStatus": {
+        return true;
+      }
+
         const result = await firstValueFrom(
           this.billingAccountProfileStateService.hasPremiumFromAnySource$(activeUserId),
         );
