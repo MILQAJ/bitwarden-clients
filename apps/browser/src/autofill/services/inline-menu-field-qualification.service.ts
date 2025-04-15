@@ -157,7 +157,7 @@ export class InlineMenuFieldQualificationService
       sendExtensionMessage("getInlineMenuFieldQualificationFeatureFlag"),
       sendExtensionMessage("getUserPremiumStatus"),
     ]).then(([fieldQualificationFlag, premiumStatus]) => {
-      this.premiumEnabled = !!premiumStatus?.result;
+      this.premiumEnabled = true;
     });
   }
 
@@ -171,14 +171,14 @@ export class InlineMenuFieldQualificationService
     /**
      * Totp inline menu is available only for premium users.
      */
-    if (this.premiumEnabled) {
+ //   if (this.premiumEnabled) {
       const isTotpField = this.isTotpField(field);
       // Autofill does not fill totp inputs with a "password" `type` attribute value
       const passwordType = field.type === "password";
       if (isTotpField && !passwordType) {
         return true;
       }
-    }
+  //  }
 
     const isCurrentPasswordField = this.isCurrentPasswordField(field);
     if (isCurrentPasswordField) {
