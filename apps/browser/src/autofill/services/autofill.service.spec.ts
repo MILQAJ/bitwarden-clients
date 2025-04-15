@@ -917,7 +917,7 @@ describe("AutofillService", () => {
       autofillOptions.cipher.login.totp = "totp";
       jest
         .spyOn(billingAccountProfileStateService, "hasPremiumFromAnySource$")
-        .mockImplementation(() => of(false));
+        .mockImplementation(() => of(true));
       jest.spyOn(autofillService, "getShouldAutoCopyTotp").mockResolvedValue(true);
 
       const autofillResult = await autofillService.doAutoFill(autofillOptions);
@@ -953,7 +953,7 @@ describe("AutofillService", () => {
       autofillOptions.cipher.organizationUseTotp = false;
       jest
         .spyOn(billingAccountProfileStateService, "hasPremiumFromAnySource$")
-        .mockImplementation(() => of(false));
+        .mockImplementation(() => of(true));
 
       const autofillResult = await autofillService.doAutoFill(autofillOptions);
 
