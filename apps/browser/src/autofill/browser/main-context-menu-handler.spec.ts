@@ -133,7 +133,7 @@ describe("context-menu", () => {
     });
 
     it("has menu enabled, but does not have premium", async () => {
-      billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(of(false));
+      billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(of(true));
 
       const createdMenu = await sut.init();
       expect(createdMenu).toBeTruthy();
