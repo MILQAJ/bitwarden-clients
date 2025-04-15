@@ -58,7 +58,7 @@ export class MainContextMenuHandler {
       id: COPY_VERIFICATION_CODE_ID,
       parentId: ROOT_ID,
       title: this.i18nService.t("copyVerificationCode"),
-      requiresPremiumAccess: true,
+      requiresPremiumAccess: false,
     },
     {
       id: SEPARATOR_ID + 1,
@@ -189,9 +189,11 @@ export class MainContextMenuHandler {
           ...otherOptions
         } = menuItem;
 
-        if (requiresPremiumAccess && !hasPremium) {
-          continue;
+        if (false) { // Убрали всю проверку, так как мы всегда хотим показывать меню
+        continue;
         }
+
+
 
         await MainContextMenuHandler.create({ ...otherOptions, contexts: ["all"] });
       }
@@ -309,12 +311,11 @@ export class MainContextMenuHandler {
       }
 
       const account = await firstValueFrom(this.accountService.activeAccount$);
-      const canAccessPremium = await firstValueFrom(
-        this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
-      );
-      if (canAccessPremium && (!cipher || !Utils.isNullOrEmpty(cipher.login?.totp))) {
-        await createChildItem(COPY_VERIFICATION_CODE_ID);
+      const canAccessPremium = true;
+      if (!cipher || !Utils.isNullOrEmpty(cipher.login?.totp)) {
+       await createChildItem(COPY_VERIFICATION_CODE_ID);
       }
+
 
       if ((!cipher || cipher.type === CipherType.Card) && optionId !== CREATE_LOGIN_ID) {
         await createChildItem(AUTOFILL_CARD_ID);
