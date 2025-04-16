@@ -26,34 +26,39 @@ export class DefaultBillingAccountProfileStateService implements BillingAccountP
   ) {}
 
   hasPremiumFromAnyOrganization$(userId: UserId): Observable<boolean> {
-  return of(true);
-}
+    return of(true);
+  }
 
-hasPremiumPersonally$(userId: UserId): Observable<boolean> {
-  return of(true);
-}
+  hasPremiumPersonally$(userId: UserId): Observable<boolean> {
+    return of(true);
+  }
 
-hasPremiumFromAnySource$(userId: UserId): Observable<boolean> {
-  return of(true);
-}
+  hasPremiumFromAnySource$(userId: UserId): Observable<boolean> {
+    return of(true);
+  }
 
-async setHasPremium(
-  hasPremiumPersonally: boolean,
-  hasPremiumFromAnyOrganization: boolean,
-  userId: UserId,
-): Promise<void> {
-  await this.stateProvider.getUser(userId, BILLING_ACCOUNT_PROFILE_KEY_DEFINITION).update((_) => {
-    return {
-      hasPremiumPersonally: hasPremiumPersonally,
-      hasPremiumFromAnyOrganization: hasPremiumFromAnyOrganization,
-    };
-  });
-}
+  async setHasPremium(
+    hasPremiumPersonally: boolean,
+    hasPremiumFromAnyOrganization: boolean,
+    userId: UserId,
+  ): Promise<void> {
+    await this.stateProvider.getUser(userId, BILLING_ACCOUNT_PROFILE_KEY_DEFINITION).update((_) => {
+      return {
+        hasPremiumPersonally: hasPremiumPersonally,
+        hasPremiumFromAnyOrganization: hasPremiumFromAnyOrganization,
+      };
+    });
+  }
 
-canViewSubscription$(userId: UserId): Observable<boolean> {
-  return of(true);
-}
-
+  canViewSubscription$(userId: UserId): Observable<boolean> {
+    return combineLatest([
+      this.hasPremiumPersonally$(userId),
+      this.hasPremiumFromAnyOrganization$(userId),
+    ]).pipe(
+      concatMap(async ([hasPremiumPersonally, hasPremiumFromOrg]) => {
+        if (hasPremiumPersonally === true || !hasPremiumFromOrg === true) {
+          return true;
+        }
 
         const isCloud = !this.platformUtilsService.isSelfHost();
 
