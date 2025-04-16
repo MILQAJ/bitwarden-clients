@@ -57,19 +57,21 @@ export class OpenAttachmentsComponent implements OnInit {
     private i18nService: I18nService,
     private filePopoutUtilsService: FilePopoutUtilsService,
     private accountService: AccountService,
-  ) {
-    this.accountService.activeAccount$
-      .pipe(
-        switchMap((account) =>
-          this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((canAccessPremium) => {
-        this.canAccessAttachments = canAccessPremium;
-      });
-  }
-
+    ) {
+    this.canAccessAttachments = true;
+    // Следующий блок можно закомментировать или удалить:
+    // this.accountService.activeAccount$
+    //   .pipe(
+    //     switchMap((account) =>
+    //       this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
+    //     ),
+    //     takeUntilDestroyed(),
+    //   )
+    //   .subscribe((canAccessPremium) => {
+    //     this.canAccessAttachments = canAccessPremium;
+    //   });
+   }
+  
   async ngOnInit(): Promise<void> {
     this.openAttachmentsInPopout = this.filePopoutUtilsService.showFilePopoutMessage(window);
 
