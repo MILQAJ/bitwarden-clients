@@ -1,5 +1,4 @@
-import { map, Observable, combineLatest, concatMap } from "rxjs";
-import { Observable, of } from 'rxjs';
+import { map, Observable, combineLatest, concatMap, of } from "rxjs";
 
 import { ApiService } from "../../../abstractions/api.service";
 import { PlatformUtilsService } from "../../../platform/abstractions/platform-utils.service";
