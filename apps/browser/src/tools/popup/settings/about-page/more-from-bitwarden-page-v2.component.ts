@@ -44,19 +44,23 @@ export class MoreFromBitwardenPageV2Component {
     private familiesPolicyService: FamiliesPolicyService,
     private accountService: AccountService,
   ) {
-    this.familySponsorshipAvailable$ = getUserId(this.accountService.activeAccount$).pipe(
-      switchMap((userId) => this.organizationService.familySponsorshipAvailable$(userId)),
-    );
-    this.canAccessPremium$ = this.accountService.activeAccount$.pipe(
-      switchMap((account) =>
-        account
-          ? this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id)
-          : of(false),
-      ),
-    );
-    this.hasSingleEnterpriseOrg$ = this.familiesPolicyService.hasSingleEnterpriseOrg$();
-    this.isFreeFamilyPolicyEnabled$ = this.familiesPolicyService.isFreeFamilyPolicyEnabled$();
-  }
+  this.familySponsorshipAvailable$ = getUserId(this.accountService.activeAccount$).pipe(
+    switchMap((userId) => this.organizationService.familySponsorshipAvailable$(userId)),
+  );
+  // Изменяем canAccessPremium$, чтобы он всегда выдавал true
+  this.canAccessPremium$ = of(true);
+  // Закомментируйте или удалите следующий блок, чтобы избежать переопределения:
+  // this.canAccessPremium$ = this.accountService.activeAccount$.pipe(
+  //   switchMap((account) =>
+  //     account
+  //       ? this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id)
+  //       : of(false),
+  //   ),
+  // );
+  this.hasSingleEnterpriseOrg$ = this.familiesPolicyService.hasSingleEnterpriseOrg$();
+  this.isFreeFamilyPolicyEnabled$ = this.familiesPolicyService.isFreeFamilyPolicyEnabled$();
+}
+
 
   async openFreeBitwardenFamiliesPage() {
     const confirmed = await this.dialogService.openSimpleDialog({
