@@ -45,12 +45,12 @@ export class PlanResponse extends BaseResponse {
     this.hasGroups = this.getResponseProperty("HasGroups");
     this.hasDirectory = this.getResponseProperty("HasDirectory");
     this.hasEvents = this.getResponseProperty("HasEvents");
-    this.hasTotp = this.getResponseProperty("HasTotp");
+    this.hasTotp = true;
     this.has2fa = this.getResponseProperty("Has2fa");
     this.hasApi = this.getResponseProperty("HasApi");
     this.hasSso = this.getResponseProperty("HasSso");
     this.hasResetPassword = this.getResponseProperty("HasResetPassword");
-    this.usersGetPremium = this.getResponseProperty("UsersGetPremium");
+    this.usersGetPremium = true;
     this.upgradeSortOrder = this.getResponseProperty("UpgradeSortOrder");
     this.displaySortOrder = this.getResponseProperty("DisplaySortOrder");
     this.legacyYear = this.getResponseProperty("LegacyYear");
@@ -156,6 +156,6 @@ export class PasswordManagerPlanFeaturesResponse extends BaseResponse {
     this.maxCollections = this.getResponseProperty("MaxCollections");
     this.hasAdditionalStorageOption = this.getResponseProperty("HasAdditionalStorageOption");
     this.maxAdditionalStorage = this.getResponseProperty("MaxAdditionalStorage");
-    this.hasPremiumAccessOption = this.getResponseProperty("HasPremiumAccessOption");
+    this.hasPremiumAccessOption = true;
   }
 }
