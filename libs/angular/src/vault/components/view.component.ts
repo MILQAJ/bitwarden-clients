@@ -513,8 +513,7 @@ export class ViewComponent implements OnDestroy, OnInit {
    * available from the cipher object itself.
    */
   private async constructCipherDetails(userId: UserId) {
-    this.canAccessPremium = await firstValueFrom(
-      this.billingAccountProfileStateService.hasPremiumFromAnySource$(userId),
+    this.canAccessPremium = true,
     );
     this.showPremiumRequiredTotp =
       this.cipher.login.totp && !this.canAccessPremium && !this.cipher.organizationUseTotp;
