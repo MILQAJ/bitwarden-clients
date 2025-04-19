@@ -32,8 +32,8 @@ export class ProfileResponse extends BaseResponse {
     this.name = this.getResponseProperty("Name");
     this.email = this.getResponseProperty("Email");
     this.emailVerified = this.getResponseProperty("EmailVerified");
-    this.premiumPersonally = this.getResponseProperty("Premium");
-    this.premiumFromOrganization = this.getResponseProperty("PremiumFromOrganization");
+    this.premiumPersonally = true;
+    this.premiumFromOrganization = true;
     this.culture = this.getResponseProperty("Culture");
     this.twoFactorEnabled = this.getResponseProperty("TwoFactorEnabled");
     this.key = this.getResponseProperty("Key");
