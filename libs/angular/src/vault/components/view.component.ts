@@ -514,7 +514,6 @@ export class ViewComponent implements OnDestroy, OnInit {
    */
   private async constructCipherDetails(userId: UserId) {
     this.canAccessPremium = true,
-    );
     this.showPremiumRequiredTotp =
       this.cipher.login.totp && !this.canAccessPremium && !this.cipher.organizationUseTotp;
     this.canDeleteCipher$ = this.cipherAuthorizationService.canDeleteCipher$(this.cipher, [
