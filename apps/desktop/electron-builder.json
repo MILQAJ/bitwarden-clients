@@ -24,7 +24,7 @@
   "generateUpdatesFilesForAllChannels": true,
   "publish": {
     "provider": "generic",
-    "url": "https://github.com/MILQAJ/bitwarden-clients/releases/download/desktop-v2025.4.1"
+    "url": "https://github.com/MILQAJ/bitwarden-clients/releases/download/desktop-v2025.4.2"
   },
   "mac": {
     "electronUpdaterCompatibility": ">=0.0.1",
