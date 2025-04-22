@@ -228,6 +228,7 @@ jobs:
         env:
           ELECTRON_BUILDER_SIGN: 1
           SIGNING_CERT_PATH: ${{ github.workspace }}/sign/BitwardenMOD.pfx
+          SIGNTOOL_PATH: ${{ steps.find_signtool.outputs.signtool_path }}
           SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: |
           npm run pack:win
