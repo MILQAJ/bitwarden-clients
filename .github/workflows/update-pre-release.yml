@@ -103,14 +103,60 @@ jobs:
             core.setOutput('run_id_for_artifacts', run_id_to_check);
             core.setOutput('package_version', package_version);
 
-      - name: Download artifacts
+      # Убедитесь, что у шага, определяющего версию, есть id, например, 'get_info' или 'read_version'
+      # Пример:
+      # - name: Determine Trigger Info and Commit SHA
+      #   id: get_info
+      #   ... outputs: package_version, run_id_for_artifacts ...
+
+      - name: Download Portable exe artifact
+        uses: actions/download-artifact@v4 # Используйте актуальную версию
+        with:
+          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe # Точное имя артефакта
+          path: artifacts/ # Скачиваем прямо в папку artifacts
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+        # continue-on-error: true # Лучше убрать на время отладки
+
+      - name: Download Installer exe artifact
         uses: actions/download-artifact@v4
         with:
-          # Имя артефакта должно совпадать с тем, что загружает workflow "Build Desktop"
-          # name: desktop-build-artifacts # Пример имени артефакта
-          path: artifacts
-          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }} # Скачиваем из нужного run
-        continue-on-error: true # Чтобы не останавливаться, если какой-то артефакт не найден
+          name: Bitwarden-Installer-${{ steps.get_info.outputs.package_version }}.exe # Точное имя артефакта
+          path: artifacts/
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+        # continue-on-error: true
+
+      - name: Download NSIS ia32 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bitwarden-${{ steps.get_info.outputs.package_version }}-ia32.nsis.7z # Точное имя артефакта
+          path: artifacts/
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+        # continue-on-error: true
+
+      - name: Download NSIS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bitwarden-${{ steps.get_info.outputs.package_version }}-x64.nsis.7z # Точное имя артефакта
+          path: artifacts/
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+        # continue-on-error: true
+
+      - name: Download NSIS ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bitwarden-${{ steps.get_info.outputs.package_version }}-arm64.nsis.7z # Точное имя артефакта
+          path: artifacts/
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+        # continue-on-error: true
+
+      # Если нужен YML файл автообновления, добавьте шаг для его скачивания
+      # - name: Download Auto-Update YML
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: latest.yml # Или другое имя, как он загружается в Build Desktop
+      #     path: artifacts/
+      #     run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
+      #   # continue-on-error: true
 
       # Шаг для чтения версии из файла, если нужно
       # - name: Read package version from file
