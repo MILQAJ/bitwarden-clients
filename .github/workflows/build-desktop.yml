@@ -288,7 +288,7 @@ jobs:
             }
 
             const targetReleaseName = 'Windows-CI-build';
-            const expectedTagName = `continuous-${packageVersion}`; // Тег для этой версии
+            const expectedTagName = `desktop-ci`; // Тег для этой версии
 
             // --- Пути к локальным файлам относительно working-directory job'а ('apps/desktop') ---
             const artifactsDistPath = 'apps/desktop/dist'; // Путь к основной папке dist внутри apps/desktop
