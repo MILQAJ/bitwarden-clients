@@ -117,7 +117,7 @@ jobs:
         shell: bash
 
       - name: Download Portable exe artifact # <-- Шаг, который выдает ошибку
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe
           path: artifacts/
@@ -125,7 +125,7 @@ jobs:
         # continue-on-error: true # Оставьте закомментированным для отладки
 
       - name: Download Installer exe artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: Bitwarden-Installer-${{ steps.get_info.outputs.package_version }}.exe # Точное имя артефакта
           path: artifacts/
@@ -133,7 +133,7 @@ jobs:
         # continue-on-error: true
 
       - name: Download NSIS ia32 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-ia32.nsis.7z # Точное имя артефакта
           path: artifacts/
@@ -141,7 +141,7 @@ jobs:
         # continue-on-error: true
 
       - name: Download NSIS x64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-x64.nsis.7z # Точное имя артефакта
           path: artifacts/
@@ -149,7 +149,7 @@ jobs:
         # continue-on-error: true
 
       - name: Download NSIS ARM64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-arm64.nsis.7z # Точное имя артефакта
           path: artifacts/
@@ -158,7 +158,7 @@ jobs:
 
       # Если нужен YML файл автообновления, добавьте шаг для его скачивания
       # - name: Download Auto-Update YML
-      #   uses: actions/download-artifact@v4
+      #   uses: actions/download-artifact@v3
       #   with:
       #     name: latest.yml # Или другое имя, как он загружается в Build Desktop
       #     path: artifacts/
