@@ -109,13 +109,20 @@ jobs:
       #   id: get_info
       #   ... outputs: package_version, run_id_for_artifacts ...
 
-      - name: Download Portable exe artifact
-        uses: actions/download-artifact@v4 # Используйте актуальную версию
+      - name: Debug Info Before Download
+        run: |
+          echo "Run ID for download: ${{ steps.get_info.outputs.run_id_for_artifacts }}"
+          echo "Package Version for download: ${{ steps.get_info.outputs.package_version }}"
+          echo "Expected Artifact Name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe"
+        shell: bash
+
+      - name: Download Portable exe artifact # <-- Шаг, который выдает ошибку
+        uses: actions/download-artifact@v4
         with:
-          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe # Точное имя артефакта
-          path: artifacts/ # Скачиваем прямо в папку artifacts
+          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe
+          path: artifacts/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
-        # continue-on-error: true # Лучше убрать на время отладки
+        # continue-on-error: true # Оставьте закомментированным для отладки
 
       - name: Download Installer exe artifact
         uses: actions/download-artifact@v4
