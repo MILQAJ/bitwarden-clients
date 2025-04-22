@@ -227,9 +227,9 @@ jobs:
         # working-directory: apps/desktop # Уже установлено
         env:
           ELECTRON_BUILDER_SIGN: 1
-          SIGNING_CERT_PATH: ${{ github.workspace }}/sign/BitwardenMOD.pfx
+          SIGNING_CERT_PATH_FROM_ROOT: ${{ github.workspace }}/sign/BitwardenMOD.pfx
           SIGNTOOL_PATH: ${{ steps.find_signtool.outputs.signtool_path }}
-          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+          SIGNING_CERTIFICATE_PASSWORD: 'sign/BitwardenMOD.pfx'
         run: |
           npm run pack:win
 
