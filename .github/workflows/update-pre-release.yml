@@ -8,137 +8,282 @@ on:
   workflow_dispatch:
     inputs:
       build_id:
-        description: 'ID успешного Workflow Run из "Build Desktop" (необязательно)'
+        description: 'ID успешного Workflow Run из "Build Desktop" (необязательно, если триггер не ручной)'
         required: false
         type: string
+      # Может быть, стоит передавать версию пакета сюда?
+      # package_version:
+      #   description: 'Версия пакета (если не определяется из артефактов)'
+      #   required: false
+      #   type: string
 
 jobs:
   update-pre-release:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Условие можно упростить, так как оно проверяется внутри шагов тоже
+    # if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      commit_sha: ${{ steps.get_info.outputs.commit_sha }} # Output commit SHA for clarity
+      package_version: ${{ steps.get_info.outputs.package_version }} # Output determined package version
     steps:
-      - name: Get build details (if triggered manually)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_id != null && github.event.inputs.build_id != '' }}
+      - name: Determine Trigger Info and Commit SHA
+        id: get_info
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const github = require('@actions/github');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const run_id_str = ${{ github.event.inputs.build_id }};
-            const run_id = parseInt(run_id_str); // Преобразуем строку в число
+            let commit_sha;
+            let run_id_to_check;
+            let package_version = process.env.PACKAGE_VERSION || ${{ github.event.inputs.package_version || 'unknown' }}; // Пример получения версии
 
-            if (isNaN(run_id)) {
-              console.error('Invalid build ID provided.');
-              core.setFailed('Invalid build ID provided.');
+            if (context.eventName === 'workflow_run') {
+              if (context.payload.workflow_run.conclusion !== 'success') {
+                 core.setFailed(`Triggering workflow run ${context.payload.workflow_run.id} was not successful.`);
+                 return;
+              }
+              console.log("Triggered by successful workflow_run.");
+              commit_sha = context.payload.workflow_run.head_commit.id;
+              run_id_to_check = context.payload.workflow_run.id; // ID для скачивания артефактов
+              // TODO: Определить package_version из workflow_run, если нужно/возможно
+              // Например, если build workflow выводит версию
+
+            } else if (context.eventName === 'workflow_dispatch') {
+              console.log("Triggered by workflow_dispatch.");
+              const run_id_str = "${{ github.event.inputs.build_id }}";
+              if (!run_id_str) {
+                core.setFailed('Manual trigger requires a "build_id" input.');
+                return;
+              }
+              const run_id = parseInt(run_id_str);
+              if (isNaN(run_id)) {
+                core.setFailed(`Invalid build ID provided: ${run_id_str}`);
+                return;
+              }
+
+              console.log(`Workspaceing details for manually specified run ID: ${run_id}`);
+              const run = await github.rest.actions.getWorkflowRun({ owner, repo, run_id });
+
+              if (run.data.conclusion !== 'success') {
+                core.setFailed(`Workflow run ${run_id} was not successful.`);
+                return;
+              }
+              commit_sha = run.data.head_commit.id;
+              run_id_to_check = run_id; // ID для скачивания артефактов
+              // package_version уже установлен из инпутов или env выше
+            } else {
+              core.setFailed(`Unsupported event type: ${context.eventName}`);
               return;
             }
 
-            const run = await github.rest.actions.getWorkflowRun({
-              owner,
-              repo,
-              run_id,
-            });
-
-            if (run.data.conclusion !== 'success') {
-              console.error(\`Workflow run ${run_id} was not successful. Aborting.\`);
-              core.setFailed(\`Workflow run ${run_id} was not successful.\`);
+            if (!commit_sha) {
+               core.setFailed("Could not determine the commit SHA.");
+               return;
             }
 
-            core.setOutput('commit_sha', run.data.head_commit.id);
-            
+            console.log(`Using commit SHA: ${commit_sha}`);
+            console.log(`Will download artifacts from run ID: ${run_id_to_check}`);
+            console.log(`Package version determined as: ${package_version}`); // Логгируем версию
+
+            core.setOutput('commit_sha', commit_sha);
+            core.setOutput('run_id_for_artifacts', run_id_to_check);
+            core.setOutput('package_version', package_version); // Выводим версию
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          # Имя артефакта должно совпадать с тем, что загружает workflow "Build Desktop"
+          # name: desktop-build-artifacts # Пример имени артефакта
           path: artifacts
+          run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }} # Скачиваем из нужного run
         continue-on-error: true # Чтобы не останавливаться, если какой-то артефакт не найден
+
+      # Шаг для чтения версии из файла, если нужно
+      # - name: Read package version from file
+      #   id: read_version
+      #   if: steps.get_info.outputs.package_version == 'unknown' # Если версия не была передана
+      #   run: |
+      #     # Пример: читаем из package.json, если он есть в артефактах
+      #     if [ -f artifacts/package.json ]; then
+      #       VERSION=$(jq -r .version artifacts/package.json)
+      #       echo "package_version=$VERSION" >> $GITHUB_OUTPUT
+      #     else
+      #       echo "package_version=fallback-version" >> $GITHUB_OUTPUT # Или установить фолбэк
+      #     fi
 
       - name: Create or update pre-release
         uses: actions/github-script@v6
+        env:
+           # Передаем версию в окружение скрипта
+           PACKAGE_VERSION: ${{ steps.get_info.outputs.package_version }}
+           # Если вы читали версию на предыдущем шаге:
+           # PACKAGE_VERSION: ${{ steps.read_version.outputs.package_version || steps.get_info.outputs.package_version }}
+           COMMIT_SHA: ${{ steps.get_info.outputs.commit_sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const github = require('@actions/github');
+            // Не используем: const github = require('@actions/github');
             const fs = require('fs');
             const path = require('path');
 
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const commit_sha = github.event.workflow_run.head_commit.id;
-            const preReleaseName = 'Windows-CI-build';
-            const artifactsPath = 'artifacts';
-            const packageVersion = process.env.PACKAGE_VERSION; // Получи версию из env, если она тебе нужна
+            // Используем переменную окружения, установленную выше
+            const commit_sha = process.env.COMMIT_SHA;
+            const packageVersion = process.env.PACKAGE_VERSION; // Получаем версию из env
 
+            // Проверка, что версия не пустая или 'unknown'
+            if (!packageVersion || packageVersion === 'unknown') {
+               core.setFailed("Package version could not be determined.");
+               return;
+            }
+
+            const preReleaseName = 'Windows-CI-build'; // Или другое имя, возможно с версией?
+            const artifactsPath = 'artifacts';
+            const preReleaseTagName = `continuous-${packageVersion}`; // Используем версию в теге
+
+            console.log(`Using Package Version: ${packageVersion}`);
+            console.log(`Using Commit SHA: ${commit_sha}`);
+            console.log(`Target Pre-release Tag: ${preReleaseTagName}`);
+
+            // Убедитесь, что имена файлов и пути соответствуют вашим артефактам
             const artifactsToUpload = [
-              { name: `Bitwarden-Portable-${packageVersion}.exe`, path: path.join(artifactsPath, `Bitwarden-Portable-${packageVersion}.exe`) },
-              { name: `Bitwarden-Installer-${packageVersion}.exe`, path: path.join(artifactsPath, `Bitwarden-Installer-${packageVersion}.exe`) },
-              { name: `bitwarden-${packageVersion}-ia32.nsis.7z`, path: path.join(artifactsPath, `bitwarden-${packageVersion}-ia32.nsis.7z`) },
-              { name: `bitwarden-${packageVersion}-x64.nsis.7z`, path: path.join(artifactsPath, `bitwarden-${packageVersion}-x64.nsis.7z`) },
-              { name: `bitwarden-${packageVersion}-arm64.nsis.7z`, path: path.join(artifactsPath, `bitwarden-${packageVersion}-arm64.nsis.7z`) },
-              // Добавь YML файл автообновления, если он тебе нужен
-            ];
+              { name: `Bitwarden-Portable-${packageVersion}.exe`, artifactPath: path.join(artifactsPath, `Bitwarden-Portable-${packageVersion}.exe`) },
+              { name: `Bitwarden-Installer-${packageVersion}.exe`, artifactPath: path.join(artifactsPath, `Bitwarden-Installer-${packageVersion}.exe`) },
+              { name: `bitwarden-${packageVersion}-ia32.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-ia32.nsis.7z`) },
+              { name: `bitwarden-${packageVersion}-x64.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-x64.nsis.7z`) },
+              { name: `bitwarden-${packageVersion}-arm64.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-arm64.nsis.7z`) },
+              // Добавьте YML файл автообновления, если он существует и нужен
+              // { name: `latest.yml`, artifactPath: path.join(artifactsPath, `latest.yml`) },
+            ].filter(a => fs.existsSync(a.artifactPath)); // Загружаем только существующие файлы
+
+            if (artifactsToUpload.length === 0) {
+                console.log("No artifacts found in the 'artifacts' directory to upload.");
+                // Решите, что делать - завершить с ошибкой или успехом без загрузки
+                // core.setFailed("No artifacts found to upload.");
+                return;
+            }
+
+            console.log("Artifacts to upload:", artifactsToUpload.map(a => a.name));
 
             // Функция для загрузки ассета
-            async function uploadAsset(releaseId, filePath) {
-              const filename = path.basename(filePath);
+            async function uploadAsset(releaseId, filePath, assetName) {
               const fileContent = fs.readFileSync(filePath);
               const fileSize = fs.statSync(filePath).size;
 
-              console.log(`Загрузка файла: ${filename} (${fileSize} bytes)`);
-              await github.rest.repos.uploadReleaseAsset({
+              console.log(`Uploading asset: ${assetName} from ${filePath} (${fileSize} bytes)`);
+              try {
+                await github.rest.repos.uploadReleaseAsset({
+                  owner,
+                  repo,
+                  release_id: releaseId,
+                  name: assetName, // Имя ассета на GitHub
+                  data: fileContent,
+                  headers: {
+                    'Content-Type': 'application/octet-stream', // or appropriate MIME type
+                    'Content-Length': fileSize,
+                  },
+                });
+                console.log(`Asset ${assetName} uploaded successfully.`);
+              } catch (error) {
+                 console.error(`Failed to upload asset ${assetName}: ${error.message}`);
+                 // Повторная попытка или обработка ошибки
+                 if (error.message.includes('already_exists')) {
+                   console.log(`Asset ${assetName} already exists. Skipping.`);
+                 } else {
+                   // Если ошибка не связана с уже существующим файлом, пробрасываем ее
+                   throw error;
+                 }
+              }
+            }
+
+            // --- Логика поиска/создания/обновления релиза ---
+
+            let release;
+            try {
+              // Попробуем найти релиз по тегу
+              console.log(`Looking for release with tag: ${preReleaseTagName}`);
+              const { data: releaseData } = await github.rest.repos.getReleaseByTag({ owner, repo, tag: preReleaseTagName });
+              release = releaseData;
+              console.log(`Found existing pre-release with ID: ${release.id} by tag.`);
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`Release with tag ${preReleaseTagName} not found. Will create a new one.`);
+              } else {
+                console.error("Error fetching release by tag:", error);
+                // Возможно, стоит поискать по имени, если тег не найден?
+                console.log(`Falling back to search by release name: ${preReleaseName}`);
+                const releases = await github.rest.repos.listReleases({ owner, repo });
+                release = releases.data.find(r => r.prerelease && r.name === preReleaseName);
+                if (release) {
+                  console.log(`Found existing pre-release with ID: ${release.id} by name.`);
+                  // Важно: Если нашли по имени, а не по тегу, значит тег может быть старым.
+                  // Возможно, стоит обновить тег существующего релиза? (Более сложная операция)
+                  // Или удалить старый релиз и создать новый с правильным тегом.
+                  // Пока что просто используем найденный релиз.
+                } else {
+                   console.log(`No release found by name either.`);
+                }
+              }
+            }
+
+            let releaseId;
+
+            if (release) {
+              // --- Обновление существующего релиза ---
+              releaseId = release.id;
+
+              // Опционально: Обновить сам релиз (например, body или target_commitish)
+              console.log("Updating release details (e.g., commit SHA)...");
+              await github.rest.repos.updateRelease({
                 owner,
                 repo,
                 release_id: releaseId,
-                name: filename,
-                data: fileContent,
-                headers: {
-                  'Content-Type': 'application/octet-stream',
-                  'Content-Length': fileSize,
-                },
+                tag_name: preReleaseTagName, // Убедимся, что тег правильный
+                target_commitish: commit_sha,
+                name: preReleaseName, // Убедимся, что имя правильное
+                body: `Autogenerated pre-release based on commit ${commit_sha.slice(0,7)}. Version: ${packageVersion}`,
+                prerelease: true
               });
-              console.log(`Файл ${filename} успешно загружен.`);
-            }
+              console.log("Release details updated.");
 
-            // Поиск существующего пре-релиза
-            const releases = await github.rest.repos.listReleases({ owner, repo });
-            const preRelease = releases.data.find(release => release.prerelease && release.name === preReleaseName);
-
-            let releaseId;
-            if (preRelease) {
-              releaseId = preRelease.id;
-              console.log(`Найден существующий пре-релиз с ID: ${releaseId}`);
 
               // Получение существующих ассетов релиза
-              const assets = await github.rest.repos.listReleaseAssets({ owner, repo, release_id });
+              console.log("Fetching existing assets...");
+              const { data: assets } = await github.rest.repos.listReleaseAssets({ owner, repo, release_id: releaseId });
 
-              // Удаление старых ассетов
-              for (const asset of assets.data) {
-                console.log(`Удаление старого ассета: ${asset.name} (ID: ${asset.id})`);
+              // Удаление старых ассетов (которые мы собираемся заменить)
+              const assetsToDelete = assets.filter(asset =>
+                 artifactsToUpload.some(artifact => artifact.name === asset.name)
+              );
+
+              for (const asset of assetsToDelete) {
+                console.log(`Deleting old asset: ${asset.name} (ID: ${asset.id})`);
                 await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
-                console.log(`Ассет ${asset.name} удален.`);
+                console.log(`Asset ${asset.name} deleted.`);
               }
 
-              // Загрузка новых ассетов
-              for (const filePath of filesToUpload) {
-                await uploadAsset(releaseId, filePath);
-              }
             } else {
-              // Создание нового пре-релиза, если он не существует
+              // --- Создание нового пре-релиза ---
+              console.log(`Creating new pre-release with tag ${preReleaseTagName}`);
               const newRelease = await github.rest.repos.createRelease({
                 owner,
                 repo,
-                tag_name: `pre-release-${commit_sha.slice(0, 7)}`, // Можно использовать SHA коммита из build workflow
+                tag_name: preReleaseTagName, // Используем тег с версией
                 name: preReleaseName,
-                body: 'Автоматически обновленный пре-релиз.',
+                body: `Autogenerated pre-release based on commit ${commit_sha.slice(0,7)}. Version: ${packageVersion}`,
                 prerelease: true,
-                target_commitish: commit_sha, // Или github.event.workflow_run.head_commit.id
+                target_commitish: commit_sha,
               });
               releaseId = newRelease.data.id;
-              console.log(`Создан новый пре-релиз с ID: ${releaseId}`);
-
-              // Загрузка ассетов в новый пре-релиз
-              for (const filePath of filesToUpload) {
-                await uploadAsset(releaseId, filePath);
-              }
+              console.log(`Created new pre-release with ID: ${releaseId}`);
             }
+
+            // --- Загрузка новых ассетов ---
+            console.log("Starting asset upload...");
+            for (const artifact of artifactsToUpload) {
+               // Передаем путь к файлу и желаемое имя ассета
+               await uploadAsset(releaseId, artifact.artifactPath, artifact.name);
+            }
+            console.log("All specified assets uploaded successfully.");
