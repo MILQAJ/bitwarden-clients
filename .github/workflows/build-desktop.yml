@@ -208,9 +208,9 @@ jobs:
         env:
           ELECTRON_BUILDER_SIGN: 1
           SIGNING_CERT_PATH: ${{ github.workspace }}/sign/BitwardenMOD.pfx
-          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: |
-          npm run pack:win -- --signing-password "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
+          npm run pack:win
 
       - name: Upload portable exe artifact
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
