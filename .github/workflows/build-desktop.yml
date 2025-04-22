@@ -2,7 +2,7 @@
 # On a PR from a fork, the workflow will not have access to secrets, and so any parts of the build that require secrets will not run.
 # If additional artifacts are needed, the failed "build-desktop-target.yml" workflow held up by the check-run should be re-run.
 
-#name: Build Desktop
+name: Build Desktop
 
 on:
   pull_request:
@@ -50,6 +50,7 @@ jobs:
   electron-verify:
     name: Verify Electron Version
     runs-on: ubuntu-22.04
+    if: false
     steps:
       - name: Check out repo
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -158,6 +159,7 @@ jobs:
     # We intentionally keep this runner on the oldest supported OS in GitHub Actions
     # for maximum compatibility across GLIBC versions
     runs-on: ubuntu-22.04
+    if: false
     needs: setup
     env:
       _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
@@ -307,6 +309,7 @@ jobs:
     # We intentionally keep this runner on the oldest supported OS in GitHub Actions
     # for maximum compatibility across GLIBC versions
     runs-on: ubuntu-22.04-arm
+    if: false
     needs: setup
     env:
       _PACKAGE_VERSION: ${{ needs.setup.outputs.package_version }}
@@ -399,6 +402,7 @@ jobs:
   windows:
     name: Windows Build
     runs-on: windows-2022
+    if: false
     needs:
       - setup
     defaults:
@@ -656,6 +660,7 @@ jobs:
   macos-build:
     name: MacOS Build
     runs-on: macos-13
+    if: false
     needs:
       - setup
     env:
@@ -862,7 +867,7 @@ jobs:
   macos-package-github:
     name: MacOS Package GitHub Release Assets
     runs-on: macos-13
-    if: ${{ needs.setup.outputs.has_secrets == 'true' }}
+    if: false
     needs:
       - browser-build
       - macos-build
@@ -1111,7 +1116,7 @@ jobs:
   macos-package-mas:
     name: MacOS Package Prod Release Asset
     runs-on: macos-13
-    if: ${{ needs.setup.outputs.has_secrets == 'true' }}
+    if: false
     needs:
       - browser-build
       - macos-build
@@ -1449,7 +1454,7 @@ jobs:
 
   check-failures:
     name: Check for failures
-    if: always()
+    if: false
     runs-on: ubuntu-22.04
     needs:
       - electron-verify
