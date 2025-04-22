@@ -200,18 +200,26 @@ jobs:
       - name: Find Signtool Path
         id: find_signtool # ID шага, чтобы ссылаться на его output
         shell: pwsh
-        run: |
-          # Ищем signtool.exe рекурсивно в стандартной папке Windows Kits
-          # Берем последнюю найденную версию (обычно самую новую)
-          $signtoolPath = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "signtool.exe" -Recurse -ErrorAction SilentlyContinue | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1).FullName
+        run: |  # Начало многострочного скрипта
+          $basePath = "C:\Program Files (x86)\Windows Kits\10\bin"
+          Write-Host "Searching for x64 signtool.exe in $basePath"
+          # Ищем все signtool.exe, фильтруем по наличию '\x64\' в пути, сортируем по дате (новейшие SDK сначала) и берем первый найденный
+          $signtoolPath = (Get-ChildItem -Path $basePath -Filter "signtool.exe" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like '*\x64\*' } | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1).FullName
+
           if ($signtoolPath -and (Test-Path $signtoolPath)) {
-            # Устанавливаем output шага с найденным путем
             echo "signtool_path=$signtoolPath" >> $env:GITHUB_OUTPUT
-            echo "Found signtool.exe at: $signtoolPath"
+            echo "Found x64 signtool.exe at: $signtoolPath"
           } else {
-            # Если не нашли - выводим ошибку и останавливаем workflow
-            echo "::error::signtool.exe not found in Windows Kits 10 bin directory!"
-            exit 1
+            # Если не нашли в стандартном месте, попробуем найти через Get-Command (если он есть в PATH)
+            Write-Warning "x64 signtool.exe not found in specific SDK path. Trying Get-Command..."
+            $signtoolPath = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+            if ($signtoolPath -and (Test-Path $signtoolPath) -and ($signtoolPath -like '*\x64\*' -or $signtoolPath -notlike '*\arm64\*' -and $signtoolPath -notlike '*\x86\*')) {
+               echo "signtool_path=$signtoolPath" >> $env:GITHUB_OUTPUT
+               echo "Found signtool.exe via Get-Command at: $signtoolPath"
+            } else {
+               echo "::error::x64 signtool.exe not found!"
+               exit 1
+            }
           }
 
       - name: Build Native Module
