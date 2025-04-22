@@ -11,11 +11,10 @@ on:
         description: 'ID успешного Workflow Run из "Build Desktop" (необязательно, если триггер не ручной)'
         required: false
         type: string
-      # Может быть, стоит передавать версию пакета сюда?
-      # package_version:
-      #   description: 'Версия пакета (если не определяется из артефактов)'
-      #   required: false
-      #   type: string
+      package_version:
+        description: 'Версия пакета (если не определяется из артефактов)'
+        required: true
+        type: string
 
 jobs:
   update-pre-release:
