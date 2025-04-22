@@ -1,0 +1,100 @@
+name: Update Pre-release
+
+on:
+  workflow_run:
+    workflows: ["Build Desktop"] # Имя твоего workflow билда
+    types: [completed]
+    branches: [main]
+
+jobs:
+  update-pre-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: windows-artifacts # Имя артефактов, которые ты загрузил в build-desktop.yml
+          path: artifacts
+
+      - name: Create or update pre-release
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const github = require('@actions/github');
+            const fs = require('fs');
+            const path = require('path');
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const commit_sha = context.sha; // Или можешь использовать github.event.workflow_run.head_commit.id
+            const preReleaseName = 'Windows-CI-build';
+
+            const artifactsPath = 'artifacts';
+            const filesToUpload = fs.readdirSync(artifactsPath, { recursive: true })
+              .map(file => path.join(artifactsPath, file));
+
+            // Функция для загрузки ассета
+            async function uploadAsset(releaseId, filePath) {
+              const filename = path.basename(filePath);
+              const fileContent = fs.readFileSync(filePath);
+              const fileSize = fs.statSync(filePath).size;
+
+              console.log(`Загрузка файла: ${filename} (${fileSize} bytes)`);
+              await github.rest.repos.uploadReleaseAsset({
+                owner,
+                repo,
+                release_id: releaseId,
+                name: filename,
+                data: fileContent,
+                headers: {
+                  'Content-Type': 'application/octet-stream',
+                  'Content-Length': fileSize,
+                },
+              });
+              console.log(`Файл ${filename} успешно загружен.`);
+            }
+
+            // Поиск существующего пре-релиза
+            const releases = await github.rest.repos.listReleases({ owner, repo });
+            const preRelease = releases.data.find(release => release.prerelease && release.name === preReleaseName);
+
+            let releaseId;
+            if (preRelease) {
+              releaseId = preRelease.id;
+              console.log(`Найден существующий пре-релиз с ID: ${releaseId}`);
+
+              // Получение существующих ассетов релиза
+              const assets = await github.rest.repos.listReleaseAssets({ owner, repo, release_id });
+
+              // Удаление старых ассетов
+              for (const asset of assets.data) {
+                console.log(`Удаление старого ассета: ${asset.name} (ID: ${asset.id})`);
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+                console.log(`Ассет ${asset.name} удален.`);
+              }
+
+              // Загрузка новых ассетов
+              for (const filePath of filesToUpload) {
+                await uploadAsset(releaseId, filePath);
+              }
+            } else {
+              // Создание нового пре-релиза, если он не существует
+              const newRelease = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: `pre-release-${commit_sha.slice(0, 7)}`, // Можно использовать SHA коммита из build workflow
+                name: preReleaseName,
+                body: 'Автоматически обновленный пре-релиз.',
+                prerelease: true,
+                target_commitish: commit_sha, // Или github.event.workflow_run.head_commit.id
+              });
+              releaseId = newRelease.data.id;
+              console.log(`Создан новый пре-релиз с ID: ${releaseId}`);
+
+              // Загрузка ассетов в новый пре-релиз
+              for (const filePath of filesToUpload) {
+                await uploadAsset(releaseId, filePath);
+              }
+            }
