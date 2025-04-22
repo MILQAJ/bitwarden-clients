@@ -119,7 +119,7 @@ jobs:
       - name: Download Portable exe artifact # <-- Шаг, который выдает ошибку
         uses: actions/download-artifact@v4
         with:
-          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe
+          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe.zip
           path: artifacts/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true # Оставьте закомментированным для отладки
