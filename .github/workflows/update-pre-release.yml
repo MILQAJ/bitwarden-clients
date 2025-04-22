@@ -19,6 +19,9 @@ on:
 jobs:
   update-pre-release:
     runs-on: ubuntu-latest
+    permissions: # <-- Добавьте или убедитесь, что есть нужные права
+      actions: read    # Право на чтение информации о запусках и артефактах
+      contents: write
     # Условие можно упростить, так как оно проверяется внутри шагов тоже
     # if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     outputs:
