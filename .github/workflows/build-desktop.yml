@@ -2,7 +2,7 @@
 # On a PR from a fork, the workflow will not have access to secrets, and so any parts of the build that require secrets will not run.
 # If additional artifacts are needed, the failed "build-desktop-target.yml" workflow held up by the check-run should be re-run.
 
-name: Build Desktop
+#name: Build Desktop
 
 on:
   pull_request:
