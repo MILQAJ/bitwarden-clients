@@ -26,7 +26,7 @@ jobs:
       commit_sha: ${{ steps.get_info.outputs.commit_sha }} # Output commit SHA for clarity
       package_version: ${{ steps.get_info.outputs.package_version }} # Output determined package version
     steps:
-      - name: Determine Trigger Info and Commit SHA
+      - name: Determine Trigger Info and Commit SHA # Определяем информацию о триггере и SHA коммита
         id: get_info
         uses: actions/github-script@v6
         with:
@@ -36,59 +36,73 @@ jobs:
             const repo = context.repo.repo;
             let commit_sha;
             let run_id_to_check;
-            let package_version = process.env.PACKAGE_VERSION || ${{ github.event.inputs.package_version || 'unknown' }}; // Пример получения версии
+
+            // 1. Получаем потенциальные версии. Выражение Actions вернет пустую строку (''), если input отсутствует.
+            const envVersion = process.env.PACKAGE_VERSION;
+            const inputVersion = "${{ github.event.inputs.package_version }}"; // Обратите внимание на кавычки вокруг выражения!
+
+            // 2. Определяем фактическую версию с помощью JavaScript || и строки по умолчанию 'unknown'.
+            let package_version = envVersion || inputVersion || 'unknown'; // Логика определения значения по умолчанию - чисто в JS
 
             if (context.eventName === 'workflow_run') {
+              // ... (остальная часть блока if остается без изменений)
               if (context.payload.workflow_run.conclusion !== 'success') {
-                 core.setFailed(`Triggering workflow run ${context.payload.workflow_run.id} was not successful.`);
+                 core.setFailed(`Запускающий workflow run ${context.payload.workflow_run.id} не был успешным.`);
                  return;
               }
-              console.log("Triggered by successful workflow_run.");
+              console.log("Запущено успешным workflow_run.");
               commit_sha = context.payload.workflow_run.head_commit.id;
-              run_id_to_check = context.payload.workflow_run.id; // ID для скачивания артефактов
-              // TODO: Определить package_version из workflow_run, если нужно/возможно
-              // Например, если build workflow выводит версию
+              run_id_to_check = context.payload.workflow_run.id;
+              // Здесь можно попытаться получить версию из вывода workflow сборки, если он ее предоставляет
 
             } else if (context.eventName === 'workflow_dispatch') {
-              console.log("Triggered by workflow_dispatch.");
-              const run_id_str = "${{ github.event.inputs.build_id }}";
-              if (!run_id_str) {
-                core.setFailed('Manual trigger requires a "build_id" input.');
-                return;
-              }
-              const run_id = parseInt(run_id_str);
-              if (isNaN(run_id)) {
-                core.setFailed(`Invalid build ID provided: ${run_id_str}`);
-                return;
-              }
+              // ... (остальная часть блока else if остается без изменений)
+               console.log("Запущено вручную через workflow_dispatch.");
+               const run_id_str = "${{ github.event.inputs.build_id }}";
+               if (!run_id_str) {
+                 core.setFailed('Ручной запуск требует указания "build_id" в inputs.');
+                 return;
+               }
+               const run_id = parseInt(run_id_str);
+               if (isNaN(run_id)) {
+                 core.setFailed(`Некорректный build ID: ${run_id_str}`);
+                 return;
+               }
+               console.log(`Получение деталей для указанного вручную run ID: ${run_id}`);
+               const run = await github.rest.actions.getWorkflowRun({ owner, repo, run_id });
+               if (run.data.conclusion !== 'success') {
+                 core.setFailed(`Workflow run ${run_id} не был успешным.`);
+                 return;
+               }
+               commit_sha = run.data.head_commit.id;
+               run_id_to_check = run_id;
+               // package_version уже определена выше из env или inputVersion
 
-              console.log(`Workspaceing details for manually specified run ID: ${run_id}`);
-              const run = await github.rest.actions.getWorkflowRun({ owner, repo, run_id });
-
-              if (run.data.conclusion !== 'success') {
-                core.setFailed(`Workflow run ${run_id} was not successful.`);
-                return;
-              }
-              commit_sha = run.data.head_commit.id;
-              run_id_to_check = run_id; // ID для скачивания артефактов
-              // package_version уже установлен из инпутов или env выше
             } else {
-              core.setFailed(`Unsupported event type: ${context.eventName}`);
+              core.setFailed(`Неподдерживаемый тип события: ${context.eventName}`);
               return;
             }
 
             if (!commit_sha) {
-               core.setFailed("Could not determine the commit SHA.");
+               core.setFailed("Не удалось определить SHA коммита.");
                return;
             }
 
-            console.log(`Using commit SHA: ${commit_sha}`);
-            console.log(`Will download artifacts from run ID: ${run_id_to_check}`);
-            console.log(`Package version determined as: ${package_version}`); // Логгируем версию
+            // Проверяем, не осталась ли версия 'unknown' после всех попыток ее определить
+            if (package_version === 'unknown') {
+               console.warn("Не удалось определить версию пакета из env или inputs. Используется 'unknown'. Возможно, стоит добавить шаг для чтения версии из артефактов.");
+               // В зависимости от требований, можно завершить с ошибкой:
+               // core.setFailed("Версия пакета не определена.");
+               // return;
+            }
+
+            console.log(`Используется SHA коммита: ${commit_sha}`);
+            console.log(`Артефакты будут загружены из run ID: ${run_id_to_check}`);
+            console.log(`Версия пакета определена как: ${package_version}`);
 
             core.setOutput('commit_sha', commit_sha);
             core.setOutput('run_id_for_artifacts', run_id_to_check);
-            core.setOutput('package_version', package_version); // Выводим версию
+            core.setOutput('package_version', package_version);
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
