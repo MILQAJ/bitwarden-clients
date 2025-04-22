@@ -128,175 +128,141 @@ jobs:
       - name: Create or update pre-release
         uses: actions/github-script@v6
         env:
-           # Передаем версию в окружение скрипта
-           PACKAGE_VERSION: ${{ steps.get_info.outputs.package_version }}
-           # Если вы читали версию на предыдущем шаге:
-           # PACKAGE_VERSION: ${{ steps.read_version.outputs.package_version || steps.get_info.outputs.package_version }}
+           PACKAGE_VERSION: ${{ steps.get_info.outputs.package_version }} # Убедитесь, что версия передается
+           # Или если читаете из файла: ${{ steps.read_version.outputs.package_version }}
            COMMIT_SHA: ${{ steps.get_info.outputs.commit_sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Не используем: const github = require('@actions/github');
             const fs = require('fs');
             const path = require('path');
 
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            // Используем переменную окружения, установленную выше
             const commit_sha = process.env.COMMIT_SHA;
-            const packageVersion = process.env.PACKAGE_VERSION; // Получаем версию из env
+            const packageVersion = process.env.PACKAGE_VERSION;
 
-            // Проверка, что версия не пустая или 'unknown'
+            // Проверка версии (оставляем как было)
             if (!packageVersion || packageVersion === 'unknown') {
                core.setFailed("Package version could not be determined.");
                return;
             }
+            if (!commit_sha) {
+                core.setFailed("Commit SHA could not be determined.");
+                return;
+            }
 
-            const preReleaseName = 'Windows-CI-build'; // Или другое имя, возможно с версией?
+            const targetReleaseName = 'Windows-CI-build'; // <--- Имя релиза, которое мы ищем и используем
             const artifactsPath = 'artifacts';
-            const preReleaseTagName = `continuous-${packageVersion}`; // Используем версию в теге
+            const expectedTagName = `continuous-${packageVersion}`; // <--- Тег, который должен быть у этой версии
 
-            console.log(`Using Package Version: ${packageVersion}`);
-            console.log(`Using Commit SHA: ${commit_sha}`);
-            console.log(`Target Pre-release Tag: ${preReleaseTagName}`);
+            console.log(`Используется версия пакета: ${packageVersion}`);
+            console.log(`Используется SHA коммита: ${commit_sha}`);
+            console.log(`Целевое имя пре-релиза: ${targetReleaseName}`);
+            console.log(`Ожидаемый тег для этой версии: ${expectedTagName}`);
 
-            // Убедитесь, что имена файлов и пути соответствуют вашим артефактам
+            // Собираем список артефактов для загрузки (оставляем как было)
             const artifactsToUpload = [
               { name: `Bitwarden-Portable-${packageVersion}.exe`, artifactPath: path.join(artifactsPath, `Bitwarden-Portable-${packageVersion}.exe`) },
               { name: `Bitwarden-Installer-${packageVersion}.exe`, artifactPath: path.join(artifactsPath, `Bitwarden-Installer-${packageVersion}.exe`) },
               { name: `bitwarden-${packageVersion}-ia32.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-ia32.nsis.7z`) },
               { name: `bitwarden-${packageVersion}-x64.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-x64.nsis.7z`) },
               { name: `bitwarden-${packageVersion}-arm64.nsis.7z`, artifactPath: path.join(artifactsPath, `bitwarden-${packageVersion}-arm64.nsis.7z`) },
-              // Добавьте YML файл автообновления, если он существует и нужен
-              // { name: `latest.yml`, artifactPath: path.join(artifactsPath, `latest.yml`) },
-            ].filter(a => fs.existsSync(a.artifactPath)); // Загружаем только существующие файлы
+              // { name: `latest.yml`, artifactPath: path.join(artifactsPath, `latest.yml`) }, // Если нужен YML
+            ].filter(a => fs.existsSync(a.artifactPath));
 
+            // Проверка наличия артефактов (оставляем как было)
             if (artifactsToUpload.length === 0) {
-                console.log("No artifacts found in the 'artifacts' directory to upload.");
-                // Решите, что делать - завершить с ошибкой или успехом без загрузки
-                // core.setFailed("No artifacts found to upload.");
-                return;
+              console.log("Не найдены артефакты для загрузки в папке 'artifacts'.");
+              return;
             }
+            console.log("Артефакты для загрузки:", artifactsToUpload.map(a => a.name));
 
-            console.log("Artifacts to upload:", artifactsToUpload.map(a => a.name));
-
-            // Функция для загрузки ассета
+            // Функция загрузки ассета (оставляем как было)
             async function uploadAsset(releaseId, filePath, assetName) {
               const fileContent = fs.readFileSync(filePath);
               const fileSize = fs.statSync(filePath).size;
-
-              console.log(`Uploading asset: ${assetName} from ${filePath} (${fileSize} bytes)`);
+              console.log(`Загрузка ассета: ${assetName} из ${filePath} (${fileSize} bytes)`);
               try {
                 await github.rest.repos.uploadReleaseAsset({
-                  owner,
-                  repo,
-                  release_id: releaseId,
-                  name: assetName, // Имя ассета на GitHub
-                  data: fileContent,
-                  headers: {
-                    'Content-Type': 'application/octet-stream', // or appropriate MIME type
-                    'Content-Length': fileSize,
-                  },
+                  owner, repo, release_id: releaseId, name: assetName, data: fileContent,
+                  headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': fileSize },
                 });
-                console.log(`Asset ${assetName} uploaded successfully.`);
+                console.log(`Ассет ${assetName} успешно загружен.`);
               } catch (error) {
-                 console.error(`Failed to upload asset ${assetName}: ${error.message}`);
-                 // Повторная попытка или обработка ошибки
-                 if (error.message.includes('already_exists')) {
-                   console.log(`Asset ${assetName} already exists. Skipping.`);
-                 } else {
-                   // Если ошибка не связана с уже существующим файлом, пробрасываем ее
-                   throw error;
-                 }
+                 console.error(`Не удалось загрузить ассет ${assetName}: ${error.message}`);
+                 if (error.message.includes('already_exists')) { console.log(`Ассет ${assetName} уже существует. Пропускается.`); }
+                 else { throw error; }
               }
             }
 
             // --- Логика поиска/создания/обновления релиза ---
 
             let release;
-            try {
-              // Попробуем найти релиз по тегу
-              console.log(`Looking for release with tag: ${preReleaseTagName}`);
-              const { data: releaseData } = await github.rest.repos.getReleaseByTag({ owner, repo, tag: preReleaseTagName });
-              release = releaseData;
-              console.log(`Found existing pre-release with ID: ${release.id} by tag.`);
-            } catch (error) {
-              if (error.status === 404) {
-                console.log(`Release with tag ${preReleaseTagName} not found. Will create a new one.`);
-              } else {
-                console.error("Error fetching release by tag:", error);
-                // Возможно, стоит поискать по имени, если тег не найден?
-                console.log(`Falling back to search by release name: ${preReleaseName}`);
-                const releases = await github.rest.repos.listReleases({ owner, repo });
-                release = releases.data.find(r => r.prerelease && r.name === preReleaseName);
-                if (release) {
-                  console.log(`Found existing pre-release with ID: ${release.id} by name.`);
-                  // Важно: Если нашли по имени, а не по тегу, значит тег может быть старым.
-                  // Возможно, стоит обновить тег существующего релиза? (Более сложная операция)
-                  // Или удалить старый релиз и создать новый с правильным тегом.
-                  // Пока что просто используем найденный релиз.
-                } else {
-                   console.log(`No release found by name either.`);
-                }
-              }
-            }
+            console.log(`Поиск пре-релиза с именем: "${targetReleaseName}"`);
+            const releases = await github.rest.repos.listReleases({ owner, repo });
+            // Ищем существующий пре-релиз ТОЛЬКО по имени
+            release = releases.data.find(r => r.prerelease && r.name === targetReleaseName);
 
             let releaseId;
 
             if (release) {
-              // --- Обновление существующего релиза ---
+              // --- РЕЛИЗ НАЙДЕН - ОБНОВЛЯЕМ ---
               releaseId = release.id;
+              console.log(`Найден существующий пре-релиз "${targetReleaseName}" с ID: ${releaseId}`);
+              const currentTag = release.tag_name;
 
-              // Опционально: Обновить сам релиз (например, body или target_commitish)
-              console.log("Updating release details (e.g., commit SHA)...");
+              // 1. Обновляем информацию о релизе (тег, коммит, описание)
+              console.log(`Обновление существующего релиза (ID: ${releaseId})`);
+              console.log(` - Целевой коммит: ${commit_sha}`);
+              console.log(` - Целевой тег: ${expectedTagName} (Текущий тег: ${currentTag})`);
               await github.rest.repos.updateRelease({
-                owner,
-                repo,
-                release_id: releaseId,
-                tag_name: preReleaseTagName, // Убедимся, что тег правильный
-                target_commitish: commit_sha,
-                name: preReleaseName, // Убедимся, что имя правильное
-                body: `Autogenerated pre-release based on commit ${commit_sha.slice(0,7)}. Version: ${packageVersion}`,
+                owner, repo, release_id: releaseId,
+                tag_name: expectedTagName, // Устанавливаем тег для ЭТОЙ версии
+                target_commitish: commit_sha, // Указываем коммит для ЭТОЙ версии
+                name: targetReleaseName, // Имя оставляем тем же
+                body: `Автоматически обновленный пре-релиз.\nКоммит: ${commit_sha.slice(0,7)}\nВерсия: ${packageVersion}`,
                 prerelease: true
               });
-              console.log("Release details updated.");
+              console.log("Информация о релизе обновлена.");
 
-
-              // Получение существующих ассетов релиза
-              console.log("Fetching existing assets...");
+              // 2. Получаем список ВСЕХ существующих ассетов
+              console.log("Получение списка существующих ассетов для удаления...");
               const { data: assets } = await github.rest.repos.listReleaseAssets({ owner, repo, release_id: releaseId });
 
-              // Удаление старых ассетов (которые мы собираемся заменить)
-              const assetsToDelete = assets.filter(asset =>
-                 artifactsToUpload.some(artifact => artifact.name === asset.name)
-              );
-
-              for (const asset of assetsToDelete) {
-                console.log(`Deleting old asset: ${asset.name} (ID: ${asset.id})`);
-                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
-                console.log(`Asset ${asset.name} deleted.`);
+              // 3. Удаляем ВСЕ старые ассеты
+              console.log(`Найдено ${assets.length} ассетов для удаления.`);
+              for (const asset of assets) { // Удаляем каждый ассет из списка
+                console.log(`Удаление старого ассета: ${asset.name} (ID: ${asset.id})`);
+                try {
+                  await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+                  console.log(`Ассет ${asset.name} удален.`);
+                } catch (deleteError) {
+                  console.error(`Не удалось удалить ассет ${asset.name} (ID: ${asset.id}): ${deleteError.message}`);
+                  // Можно добавить логику повтора или пропустить ошибку
+                }
               }
+              console.log("Удаление старых ассетов завершено.");
 
             } else {
-              // --- Создание нового пре-релиза ---
-              console.log(`Creating new pre-release with tag ${preReleaseTagName}`);
+              // --- РЕЛИЗ НЕ НАЙДЕН - СОЗДАЕМ ---
+              console.log(`Пре-релиз с именем "${targetReleaseName}" не найден. Создание нового...`);
               const newRelease = await github.rest.repos.createRelease({
-                owner,
-                repo,
-                tag_name: preReleaseTagName, // Используем тег с версией
-                name: preReleaseName,
-                body: `Autogenerated pre-release based on commit ${commit_sha.slice(0,7)}. Version: ${packageVersion}`,
+                owner, repo,
+                tag_name: expectedTagName, // Тег для новой версии
+                name: targetReleaseName, // Имя, которое искали
+                body: `Автоматически созданный пре-релиз.\nКоммит: ${commit_sha.slice(0,7)}\nВерсия: ${packageVersion}`,
                 prerelease: true,
                 target_commitish: commit_sha,
               });
               releaseId = newRelease.data.id;
-              console.log(`Created new pre-release with ID: ${releaseId}`);
+              console.log(`Создан новый пре-релиз с ID: ${releaseId}`);
+              // Старых ассетов для удаления нет
             }
 
-            // --- Загрузка новых ассетов ---
-            console.log("Starting asset upload...");
+            // --- Загрузка НОВЫХ ассетов ---
+            console.log(`Загрузка ${artifactsToUpload.length} новых ассетов...`);
             for (const artifact of artifactsToUpload) {
-               // Передаем путь к файлу и желаемое имя ассета
                await uploadAsset(releaseId, artifact.artifactPath, artifact.name);
             }
-            console.log("All specified assets uploaded successfully.");
+            console.log("Загрузка новых ассетов успешно завершена.");
