@@ -119,8 +119,8 @@ jobs:
       - name: Download Portable exe artifact # <-- Шаг, который выдает ошибку
         uses: actions/download-artifact@v4
         with:
-          name: "Bitwarden-Portable-2025.4.2.exe"
-          path: artifacts/
+          name: Bitwarden-Portable-${{ steps.get_info.outputs.package_version }}.exe
+          path: apps/desktop/dist/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true # Оставьте закомментированным для отладки
 
@@ -128,7 +128,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Bitwarden-Installer-${{ steps.get_info.outputs.package_version }}.exe # Точное имя артефакта
-          path: artifacts/
+          path: apps/desktop/dist/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true
 
@@ -136,7 +136,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-ia32.nsis.7z # Точное имя артефакта
-          path: artifacts/
+          path: apps/desktop/dist/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true
 
@@ -144,7 +144,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-x64.nsis.7z # Точное имя артефакта
-          path: artifacts/
+          path: apps/desktop/dist/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true
 
@@ -152,7 +152,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bitwarden-${{ steps.get_info.outputs.package_version }}-arm64.nsis.7z # Точное имя артефакта
-          path: artifacts/
+          path: apps/desktop/dist/
           run-id: ${{ steps.get_info.outputs.run_id_for_artifacts }}
         # continue-on-error: true
 
