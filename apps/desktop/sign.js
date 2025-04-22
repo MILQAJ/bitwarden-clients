@@ -7,7 +7,7 @@ module.exports = async function (configuration) {
     console.log(`[*] Signing file: ${configuration.path}`);
 
     const signToolPath = 'C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.XXXX.0\\x64\\signtool.exe'; // !!! ВАЖНО: Обновите этот путь, если он отличается !!!
-    const certificatePath = path.resolve(__dirname, '..', 'sign', 'BitwardenMOD.pfx');
+    const certificatePath = path.resolve(process.env.GITHUB_WORKSPACE, process.env.SIGNING_CERT_PATH_FROM_ROOT);
     const certificatePassword = process.env.SIGNING_CERTIFICATE_PASSWORD;
     const timestampServer = 'http://timestamp.digicert.com';
     const digestAlgorithm = configuration.hash || 'sha256'; // По умолчанию используем sha256, если не указано другое
