@@ -10,7 +10,7 @@ on:
       build_id:
         description: 'ID успешного Workflow Run из "Build Desktop" (необязательно)'
         required: false
-        type: number
+        type: string
 
 jobs:
   update-pre-release:
@@ -18,7 +18,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Get build details (if triggered manually)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_id != null }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_id != null && github.event.inputs.build_id != '' }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -26,7 +26,14 @@ jobs:
             const github = require('@actions/github');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const run_id = ${{ github.event.inputs.build_id }};
+            const run_id_str = ${{ github.event.inputs.build_id }};
+            const run_id = parseInt(run_id_str); // Преобразуем строку в число
+
+            if (isNaN(run_id)) {
+              console.error('Invalid build ID provided.');
+              core.setFailed('Invalid build ID provided.');
+              return;
+            }
 
             const run = await github.rest.actions.getWorkflowRun({
               owner,
@@ -35,8 +42,8 @@ jobs:
             });
 
             if (run.data.conclusion !== 'success') {
-              console.error(`Workflow run ${run_id} was not successful. Aborting.`);
-              core.setFailed(`Workflow run ${run_id} was not successful.`);
+              console.error(\`Workflow run ${run_id} was not successful. Aborting.\`);
+              core.setFailed(\`Workflow run ${run_id} was not successful.\`);
             }
 
             core.setOutput('commit_sha', run.data.head_commit.id);
