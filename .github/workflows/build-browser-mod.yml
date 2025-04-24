@@ -94,7 +94,6 @@ jobs:
           echo "has_secrets=$has_secrets" >> $GITHUB_OUTPUT
 
       - name: Delete previous skipped runs of this workflow
-        # Используем то же условие if, что и для основного job'а, чтобы шаг не выполнялся лишний раз
         if: >
           github.event_name == 'pull_request' ||
           github.event_name == 'workflow_call' ||
