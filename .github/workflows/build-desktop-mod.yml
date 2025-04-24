@@ -305,7 +305,9 @@ jobs:
       # --- НОВЫЙ ШАГ: Обновление пре-релиза "Windows-CI-build" ---
       - name: Update 'Windows-CI-build' Pre-release
         # Выполняется только при push в main, чтобы не затрагивать PR и другие ветки
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
         uses: actions/github-script@v6
         # Передаем нужные переменные в окружение скрипта
         env:
