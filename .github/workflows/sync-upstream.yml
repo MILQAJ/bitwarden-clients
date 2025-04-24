@@ -1,0 +1,64 @@
+name: Sync Fork with Upstream
+
+on:
+  schedule:
+    # Запуск в 05:00 UTC (соответствует 08:00 MSK - утро)
+    - cron: '0 5 * * *'
+    # Запуск в 09:00 UTC (соответствует 12:00 MSK - полдень)
+    - cron: '0 9 * * *'
+    # Запуск в 15:00 UTC (соответствует 18:00 MSK - вечер)
+    - cron: '0 15 * * *'
+    # Запуск в 21:00 UTC (соответствует 00:00 MSK - полночь)
+    - cron: '0 21 * * *'
+  workflow_dispatch: # Оставляем возможность ручного запуска
+    inputs:
+      branch_to_sync:
+        description: 'Branch to sync (in your fork and upstream)'
+        required: true
+        default: 'main'
+
+jobs:
+  sync:
+    name: Sync ${{ github.event.inputs.branch_to_sync || 'main' }} branch
+    runs-on: ubuntu-latest
+    # Даем права на запись в репозиторий (для git push)
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Получаем код вашего форка
+      - name: Checkout Fork
+        uses: actions/checkout@v4 # Используйте актуальную версию
+        with:
+          ref: ${{ github.event.inputs.branch_to_sync || 'main' }} # Получаем нужную ветку
+          # Используем токен для push обратно в репозиторий
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Получаем всю историю, чтобы избежать проблем при слиянии
+          fetch-depth: 0
+
+      # 2. Настраиваем Git (имя и email для коммитов слияния)
+      - name: Set up Git config
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      # 3. Добавляем оригинальный репозиторий как remote "upstream"
+      - name: Add upstream remote
+        run: |
+          # !!! ЗАМЕНИТЕ URL НА АДРЕС ОРИГИНАЛЬНОГО РЕПОЗИТОРИЯ !!!
+          git remote add upstream https://github.com/bitwarden/clients.git # Пример для Bitwarden Clients
+
+      # 4. Получаем изменения из upstream
+      - name: Fetch upstream changes
+        run: git fetch upstream
+
+      # 5. Выполняем слияние ветки из upstream в вашу ветку
+      - name: Merge upstream branch
+        run: |
+          git merge --no-edit upstream/${{ github.event.inputs.branch_to_sync || 'main' }}
+        # Опция --no-edit используется, чтобы не открывать редактор для сообщения коммита слияния, если он понадобится
+
+      # 6. Отправляем изменения (включая коммит слияния, если он был) обратно в ваш форк
+      - name: Push changes to fork
+        run: |
+          git push origin ${{ github.event.inputs.branch_to_sync || 'main' }}
