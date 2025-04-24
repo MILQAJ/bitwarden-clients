@@ -41,6 +41,10 @@ on:
         description: "Force distribute to TestFlight regardless of branch (useful for QA testing on feature branches)"
         type: boolean
         default: true
+  workflow_run:
+    workflows: ["Sync Fork with Upstream"]
+    types:
+      - completed
 
 defaults:
   run:
@@ -49,6 +53,12 @@ defaults:
 jobs:
   electron-verify:
     name: Verify Electron Version
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     steps:
       - name: Check out repo
@@ -70,6 +80,12 @@ jobs:
 
   setup:
     name: Setup
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     outputs:
       package_version: ${{ steps.retrieve-version.outputs.package_version }}
@@ -143,6 +159,12 @@ jobs:
 
   windows:
     name: Windows Build
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: windows-2022
     needs:
       - setup
