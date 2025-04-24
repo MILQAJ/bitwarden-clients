@@ -52,13 +52,45 @@ jobs:
       - name: Fetch upstream changes
         run: git fetch upstream
 
+      - name: Check for new commits
+        id: check_sync # ID шага для ссылки на output
+        run: |
+          # Получаем текущую ветку (main или из input)
+          BRANCH="${{ github.event.inputs.branch_to_sync || 'main' }}"
+          echo "Checking branch: $BRANCH"
+
+          # Получаем SHA локальной ветки
+          LOCAL_SHA=$(git rev-parse HEAD)
+          echo "Local SHA: $LOCAL_SHA"
+
+          # Получаем SHA соответствующей ветки upstream
+          UPSTREAM_SHA=$(git rev-parse upstream/$BRANCH)
+          echo "Upstream SHA: $UPSTREAM_SHA"
+
+          # Сравниваем SHA и устанавливаем output
+          if [[ "$LOCAL_SHA" == "$UPSTREAM_SHA" ]]; then
+            echo "Ветка $BRANCH уже синхронизирована с upstream/$BRANCH."
+            echo "is_up_to_date=true" >> $GITHUB_OUTPUT
+          else
+            # Подсчитаем количество новых коммитов (для информации)
+            COMMIT_COUNT=$(git rev-list HEAD..upstream/$BRANCH --count)
+            echo "Найдено $COMMIT_COUNT новых коммитов в upstream/$BRANCH."
+            echo "is_up_to_date=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash # Используем bash для удобства сравнения строк
+
       # 5. Выполняем слияние ветки из upstream в вашу ветку
       - name: Merge upstream branch
+      # Выполняем, только если is_up_to_date не true
+        if: steps.check_sync.outputs.is_up_to_date != 'true'
         run: |
           git merge --no-edit upstream/${{ github.event.inputs.branch_to_sync || 'main' }}
+          echo "Слияние выполнено."
         # Опция --no-edit используется, чтобы не открывать редактор для сообщения коммита слияния, если он понадобится
 
       # 6. Отправляем изменения (включая коммит слияния, если он был) обратно в ваш форк
       - name: Push changes to fork
+      # Выполняем, только если is_up_to_date не true
+        if: steps.check_sync.outputs.is_up_to_date != 'true'
         run: |
           git push origin ${{ github.event.inputs.branch_to_sync || 'main' }}
