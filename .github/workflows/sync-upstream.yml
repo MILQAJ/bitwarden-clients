@@ -23,7 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     # Даем права на запись в репозиторий (для git push)
     permissions:
-      contents: write
+      contents: write  # Оставляем для git push
+      actions: write
 
     steps:
       # 1. Получаем код вашего форка
@@ -35,6 +36,72 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           # Получаем всю историю, чтобы избежать проблем при слиянии
           fetch-depth: 0
+          
+      - name: Delete previous failed runs
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            // --- Укажите ТОЧНОЕ имя файла вашего workflow ---
+            const workflowFileName = 'sync-upstream.yml';
+            const currentRunId = context.runId;
+
+            console.log(`Ищем неудачные ('failure') запуски workflow '${workflowFileName}' в <span class="math-inline">\{owner\}/</span>{repo}`);
+            console.log(`Текущий ID запуска (не будет удален): ${currentRunId}`);
+
+            try {
+              // Получаем список неудачных запусков для ЭТОГО workflow
+              // Используем пагинацию для обработки >100 записей
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
+                workflow_id: workflowFileName,
+                status: 'failure',
+                per_page: 50, // Можно настроить количество на страницу
+              });
+
+              if (!runs || runs.length === 0) {
+                console.log("Не найдено старых неудачных запусков для удаления.");
+                return;
+              }
+
+              console.log(`Найдено ${runs.length} неудачных запусков.`);
+
+              // Фильтруем, чтобы случайно не удалить текущий запуск
+              const runsToDelete = runs.filter(run => run.id !== currentRunId);
+
+              if (runsToDelete.length === 0) {
+                  console.log("Нет старых неудачных запусков для удаления.");
+                  return;
+              }
+
+              console.log(`Будет удалено ${runsToDelete.length} старых неудачных запусков...`);
+
+              // Удаляем каждый найденный неудачный запуск (кроме текущего)
+              for (const run of runsToDelete) {
+                console.log(`Удаление запуска ID: ${run.id}, Status: ${run.status}, Conclusion: ${run.conclusion} (Создан: ${run.created_at})`);
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                  console.log(` -> Запуск ${run.id} успешно удален.`);
+                  // Небольшая пауза между запросами к API
+                  await new Promise(resolve => setTimeout(resolve, 500)); // 0.5 секунды
+                } catch (deleteError) {
+                  // Выводим предупреждение, но продолжаем удалять остальные
+                  core.warning(` -> Не удалось удалить запуск ${run.id}: ${deleteError.message}`);
+                }
+              }
+              console.log("Очистка старых неудачных запусков завершена.");
+
+            } catch (error) {
+              // Выводим предупреждение, если не удалось получить список или произошла другая ошибка
+              core.warning(`Ошибка при получении или удалении запусков workflow: ${error.message}`);
+            }
 
       # 2. Настраиваем Git (имя и email для коммитов слияния)
       - name: Set up Git config
