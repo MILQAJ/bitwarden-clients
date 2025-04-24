@@ -96,10 +96,8 @@ jobs:
       - name: Delete previous skipped runs of this workflow
         if: >
           github.event_name == 'pull_request' ||
-          github.event_name == 'workflow_call' ||
-          github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) || # Адаптируйте ветки при необходимости
-          (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success') # Адаптируйте имя workflow синхронизации
+          (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) || 
+          (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
