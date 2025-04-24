@@ -79,6 +79,13 @@ jobs:
           fi
         shell: bash # Используем bash для удобства сравнения строк
 
+      - name: Fail workflow if no new commits found
+        # Выполняем, ТОЛЬКО если is_up_to_date РАВНО true
+        if: steps.check_sync.outputs.is_up_to_date == 'true'
+        run: |
+          echo "::warning::Нет новых коммитов для синхронизации. Завершаем workflow с ошибкой, чтобы не запускать последующие билды."
+          exit 1 # Завершаем шаг (и весь job/workflow) с кодом ошибки > 0 = Failure
+
       # 5. Выполняем слияние ветки из upstream в вашу ветку
       - name: Merge upstream branch
       # Выполняем, только если is_up_to_date не true
