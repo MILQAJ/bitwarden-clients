@@ -36,6 +36,12 @@ on:
         description: "Custom SDK branch"
         required: false
         type: string
+  workflow_run:
+    # Укажите точное имя workflow синхронизации (из поля 'name:' в sync-upstream.yml)
+    # ИЛИ имя файла (sync-upstream.yml)
+    workflows: ["Sync Fork with Upstream"] # <--- !!! ЗАМЕНИТЕ НА ВАШЕ ИМЯ WORKFLOW СИНХРОНИЗАЦИИ !!!
+    types:
+      - completed
 
 defaults:
   run:
@@ -44,6 +50,12 @@ defaults:
 jobs:
   setup:
     name: Setup
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     outputs:
       repo_url: ${{ steps.gen_vars.outputs.repo_url }}
@@ -84,6 +96,12 @@ jobs:
 
   locales-test:
     name: Locales Test
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     needs:
       - setup
@@ -123,6 +141,12 @@ jobs:
 
   build-source:
     name: Build browser source
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     needs:
       - setup
@@ -185,6 +209,12 @@ jobs:
 
   build:
     name: Build
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-22.04
     needs:
       - setup
@@ -288,7 +318,9 @@ jobs:
     # Зависит от setup (для получения _BUILD_NUMBER) и build (чтобы все сборки завершились)
     needs: [setup, build]
     # Выполняется только при push в main (или измените условие)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
     permissions:
       actions: read    # Право на чтение артефактов
       contents: write  # Право на создание/обновление релиза
