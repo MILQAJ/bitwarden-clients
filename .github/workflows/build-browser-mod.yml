@@ -27,7 +27,7 @@ on:
       - '*'
       - '!*.md'
       - '!*.txt'
-      - '.github/workflows/build-browser.yml'
+      - '.github/workflows/build-browser-mod.yml'
   workflow_call:
     inputs: {}
   workflow_dispatch:
