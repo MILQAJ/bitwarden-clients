@@ -16,7 +16,7 @@ on:
       - '*'
       - '!*.md'
       - '!*.txt'
-      - '.github/workflows/build-desktop.yml'
+      - '.github/workflows/build-desktop-mod.yml'
   push:
     branches:
       - 'main'
@@ -28,7 +28,7 @@ on:
       - '*'
       - '!*.md'
       - '!*.txt'
-      - '.github/workflows/build-desktop.yml'
+      - '.github/workflows/build-desktop-mod.yml'
   workflow_call:
     inputs: {}
   workflow_dispatch:
