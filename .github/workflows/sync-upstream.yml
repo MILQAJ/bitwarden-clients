@@ -55,29 +55,28 @@ jobs:
       - name: Check for new commits
         id: check_sync # ID шага для ссылки на output
         run: |
-          # Получаем текущую ветку (main или из input)
           BRANCH="${{ github.event.inputs.branch_to_sync || 'main' }}"
           echo "Checking branch: $BRANCH"
 
-          # Получаем SHA локальной ветки
           LOCAL_SHA=$(git rev-parse HEAD)
-          echo "Local SHA: $LOCAL_SHA"
-
-          # Получаем SHA соответствующей ветки upstream
           UPSTREAM_SHA=$(git rev-parse upstream/$BRANCH)
+          echo "Local SHA: $LOCAL_SHA"
           echo "Upstream SHA: $UPSTREAM_SHA"
 
-          # Сравниваем SHA и устанавливаем output
-          if [[ "$LOCAL_SHA" == "$UPSTREAM_SHA" ]]; then
-            echo "Ветка $BRANCH уже синхронизирована с upstream/$BRANCH."
-            echo "is_up_to_date=true" >> $GITHUB_OUTPUT
-          else
-            # Подсчитаем количество новых коммитов (для информации)
-            COMMIT_COUNT=$(git rev-list HEAD..upstream/$BRANCH --count)
-            echo "Найдено $COMMIT_COUNT новых коммитов в upstream/$BRANCH."
+          # Считаем коммиты в upstream/$BRANCH, которых нет в локальной HEAD
+          COMMIT_COUNT=$(git rev-list HEAD..upstream/$BRANCH --count)
+          echo "Found $COMMIT_COUNT new commits in upstream/$BRANCH."
+
+          # Устанавливаем output на основе КОЛИЧЕСТВА новых коммитов
+          if [[ "$COMMIT_COUNT" -gt 0 ]]; then
+            # Есть новые коммиты, нужно обновляться
             echo "is_up_to_date=false" >> $GITHUB_OUTPUT
+          else
+            # Новых коммитов нет (ветка синхронизирована или опережает)
+            echo "Ветка $BRANCH уже синхронизирована или опережает upstream/$BRANCH."
+            echo "is_up_to_date=true" >> $GITHUB_OUTPUT
           fi
-        shell: bash # Используем bash для удобства сравнения строк
+        shell: bash
 
       - name: Fail workflow if no new commits found
         # Выполняем, ТОЛЬКО если is_up_to_date РАВНО true
