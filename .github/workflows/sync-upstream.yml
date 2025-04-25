@@ -31,10 +31,6 @@ jobs:
           fetch-depth: 0
 
       - name: Delete previous skipped runs of build browser workflow
-        if: >
-          github.event_name == 'pull_request' ||
-          (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/rc' || github.ref == 'refs/heads/hotfix-rc-desktop')) || 
-          (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Sync Fork with Upstream' && github.event.workflow_run.conclusion == 'success')
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
