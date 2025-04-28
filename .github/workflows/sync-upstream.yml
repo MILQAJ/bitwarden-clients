@@ -2,7 +2,7 @@ name: Sync Fork with Upstream
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/60 * * * *'
   workflow_dispatch: # Оставляем возможность ручного запуска
     inputs:
       branch_to_sync:
