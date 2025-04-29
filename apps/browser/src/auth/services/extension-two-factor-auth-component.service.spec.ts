@@ -1,6 +1,6 @@
 import { MockProxy, mock } from "jest-mock-extended";
 
-// Must mock modules before importing
+// Must mock modules before importing 
 jest.mock("../popup/utils/auth-popout-window", () => {
   const originalModule = jest.requireActual("../popup/utils/auth-popout-window");
 
